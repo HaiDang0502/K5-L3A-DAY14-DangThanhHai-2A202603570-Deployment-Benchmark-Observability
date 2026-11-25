@@ -563,6 +563,25 @@ agent_question_length_chars_sum 40.0
 1. Counter: `http_requests_total` (chỉ tăng). Gauge: `agent_in_flight_requests` (lên xuống). Histogram: `agent_question_length_chars` (bucket cộng dồn).
 2. Nếu dùng URL thật làm label, bot gọi hàng nghìn URL lạ sẽ tạo hàng nghìn time series, Prometheus tốn RAM. Dùng `route.path` và gom phần còn lại vào `unmatched` giữ số series nhỏ.
 
+### Exercise 7.4: Observability stack
+
+Stack 2 instance, Locust 30 users / ramp up 5. Số lấy từ Prometheus khi đang có tải (p95 và avg tính bằng giây):
+
+```text
+p95:          0.29267
+avg:          0.2324
+error_rate:   0.01055
+rps_instance: 172.19.0.7:8000 = 9.52727, 172.19.0.8:8000 = 9.43636
+tokens/s:     input = 1387.45455, output = 738.25455
+cost_gio:     1.88151
+GET /metrics qua nginx: 404
+```
+
+1. p95 khoảng 293 ms, avg khoảng 232 ms. Phần lớn request nhanh, nhưng avg bị khoảng 3% request chậm 1.7 giây kéo lên. p95 chưa chạm nhóm này vì nhóm chậm chưa tới 5%, nên phải xem thêm p99 mới thấy tail latency. p95 của Prometheus là giá trị nội suy trong bucket nên chỉ gần đúng.
+2. Có. Hai instance nhận 9.53 và 9.44 request/giây, chênh khoảng 1%.
+3. Input gồm system prompt, tài liệu retrieval và câu hỏi, còn output chỉ là câu trả lời ngắn. Input/output khoảng 1.9 lần.
+4. 404. Nginx chặn `/metrics` vì metric lộ route, lưu lượng và phiên bản. Prometheus lấy trực tiếp từ agent trong mạng nội bộ.
+
 ## AI log
 
 | Phần | Hỏi gì | Nhận gì | Tự sửa / tự kiểm tra |
@@ -574,3 +593,4 @@ agent_question_length_chars_sum 40.0
 | Part 5 | Hướng dẫn Exercise 5.1–5.5 (Claude Code) | Các lệnh chạy, bản nháp câu trả lời 5.1–5.5 | Tự chạy bản develop, gọi `/health`, `/ready`, thử SIGTERM khi có request đang chạy. Tự chạy stack 3 instance, gọi 10 request và chạy `test_stateless.py`. TODO: ghi phần bạn tự sửa |
 | Part 6 | Hướng dẫn làm `06-lab-complete/`, lỗi cài `pydantic` trên Python 3.14 (Claude Code) | Code gợi ý kèm giải thích cho 6 file trong `app/`, `Dockerfile`, `.dockerignore`, `docker-compose.yml`, `railway.toml`; cách xử lý môi trường Python | Đưa code vào dự án, tự chạy `check_production_ready.py`: 7/12 ở chế độ `--skip-docker`, sau đó PASS 12/12 bản đầy đủ. TODO: ghi phần bạn tự sửa và tự kiểm tra thêm |
 | Part 7 (Bước 1) | Hướng dẫn Exercise 7.1–7.3 (Claude Code) | Code metric `agent_question_length_chars`, hai tài liệu thêm vào `KNOWLEDGE_BASE` (theo lời giải mẫu), file `.github/workflows/eval.yml` do Claude tạo, bản nháp nhận xét trong `BENCHMARK_REPORT.md`, cách tìm nút thắt ở mức 100 | Đưa code vào dự án, tự chạy load test 4 mức, 3 mức `MOCK_SLOW_RATE`, eval v1, v2 và v2 sau khi sửa. TODO: ghi phần bạn tự sửa |
+| Part 7 (Bước 2) | Hướng dẫn Exercise 7.4–7.7, lỗi Locust nhận toàn 502 (Claude Code) | Các lệnh chạy. Claude đọc log thấy agent crash `No module named 'uvicorn'` và thêm `ENV PYTHONUSERBASE=/home/agent/.local` vào `benchmark-observability/production/Dockerfile` | Lần chạy Locust đầu tiên bị 502 toàn bộ nên bỏ. Lần hai bị loại vì Prometheus cho thấy số instance sai (`docker compose run` đưa agent về 2 replica). Lần ba đo lại với `--no-deps`, tự kiểm tra đúng 1 và 3 instance. Tự chụp Grafana, Jaeger, Prometheus; tự chạy thí nghiệm A, B, E (lần đầu của E bị loại vì chạy sai thư mục). TODO: ghi phần bạn tự kiểm tra |
